@@ -1,105 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OldChain (OLDC) - Bitcoin Museum Public Wallet</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OldChain (OLDC) – Bitcoin Museum Wallet</title>
   <style>
     body {
+      background-color: #0d0d0d;
+      color: #f5f5f5;
       font-family: Arial, sans-serif;
-      background-color: #0d1117;
-      color: #c9d1d9;
       text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background-color: #161b22;
-      padding: 20px;
+      padding: 30px;
     }
     h1 {
       color: #f7931a;
+      font-size: 28px;
+      margin-bottom: 10px;
     }
-    table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
+    h2 {
+      color: #bbb;
+      font-size: 20px;
+      margin-top: 5px;
     }
-    th, td {
+    #balance {
+      font-size: 22px;
+      color: #00ffae;
+      margin: 20px 0;
+    }
+    .transaction {
+      background-color: #1a1a1a;
       padding: 10px;
-      border-bottom: 1px solid #30363d;
+      margin: 10px auto;
+      border-radius: 10px;
+      max-width: 600px;
+      text-align: left;
+      border: 1px solid #333;
+    }
+    .transaction:hover {
+      background-color: #222;
     }
     a {
-      color: #58a6ff;
+      color: #f7931a;
       text-decoration: none;
     }
+    a:hover {
+      text-decoration: underline;
+    }
     footer {
-      margin: 30px;
-      color: #8b949e;
+      margin-top: 40px;
       font-size: 14px;
+      color: #888;
+    }
+    .loading {
+      color: #aaa;
+      font-size: 18px;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>OldChain (OLDC) – Bitcoin Museum Public Wallet</h1>
-    <p>Full transparency. Every transaction remains forever on the blockchain.</p>
-  </header>
+  <h1>OldChain (OLDC) – Bitcoin Museum Public Wallet</h1>
+  <h2>Full transparency. Every transaction remains forever on the blockchain.</h2>
 
-  <div id="content">
-    <p>Loading transactions...</p>
+  <div id="balance">Loading balance...</div>
+  <div id="transactions">
+    <div class="loading">Loading transactions, please wait...</div>
   </div>
 
   <footer>
-    <p>Powered by OldChain (OLDC) • Data from mempool.space • 100% watch-only</p>
+    Powered by OldChain (OLDC) • Bitcoin Museum Wallet
   </footer>
 
   <script>
-    const ZPUB = "zpub6ndNUNfTLkvjFzL9Hw9hBn7X38y1DkXHMJxGa3NV2XhQfu6Nn3zsqf1VSQYuSf5dataE7fYhjxGyWJTGFoNumS2oGLZw32MS4hyBWmaTczS";
-    const API = "https://mempool.space/api/address/";
+    const address = 'bc1qhafmeu2jntmfr8t8an9y09gkfqv3ac83vldwtj';
+    const balanceElement = document.getElementById('balance');
+    const transactionsElement = document.getElementById('transactions');
 
-    async function getAddressesFromZpub(zpub, count = 10) {
-      // to simplify: use electrumx path for first few addresses
-      const response = await fetch(`https://mempool.space/api/v1/addresses/xpub/${zpub}`);
-      if (!response.ok) {
-        document.getElementById("content").innerHTML = `<p>⚠️ Error loading data. Please try again later.</p>`;
-        return;
-      }
-      const data = await response.json();
-      showTransactions(data);
-    }
+    async function loadWalletData() {
+      try {
+        // Fetch address data
+        const res = await fetch(`https://mempool.space/api/address/${address}`);
+        const data = await res.json();
 
-    function showTransactions(addresses) {
-      if (!addresses || !addresses.length) {
-        document.getElementById("content").innerHTML = "<p>No transactions yet.</p>";
-        return;
-      }
-      let html = `
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Amount (BTC)</th>
-            <th>Transaction</th>
-          </tr>
-        </thead>
-        <tbody>`;
-      addresses.forEach(addr => {
-        addr.transactions.forEach(tx => {
-          const date = new Date(tx.status.block_time * 1000).toLocaleString();
-          html += `
-            <tr>
-              <td>${date}</td>
-              <td>${(tx.vout[0].value / 100000000).toFixed(8)}</td>
-              <td><a href="https://mempool.space/tx/${tx.txid}" target="_blank">${tx.txid.slice(0, 15)}...</a></td>
-            </tr>`;
+        const balanceBTC = data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum;
+        const btcValue = balanceBTC / 100000000;
+
+        balanceElement.textContent = `Current Balance: ${btcValue.toFixed(8)} BTC`;
+
+        // Fetch transactions
+        const txsRes = await fetch(`https://mempool.space/api/address/${address}/txs`);
+        const txs = await txsRes.json();
+
+        transactionsElement.innerHTML = '';
+
+        txs.forEach(tx => {
+          const div = document.createElement('div');
+          div.classList.add('transaction');
+
+          const time = new Date(tx.status.block_time * 1000).toLocaleString();
+          const amount = tx.vout.reduce((sum, v) => sum + (v.scriptpubkey_address === address ? v.value : 0), 0) / 100000000;
+
+          div.innerHTML = `
+            <strong>TXID:</strong> <a href="https://mempool.space/tx/${tx.txid}" target="_blank">${tx.txid.slice(0, 25)}...</a><br>
+            <strong>Date:</strong> ${time}<br>
+            <strong>Amount:</strong> ${amount.toFixed(8)} BTC<br>
+            <strong>Block:</strong> ${tx.status.block_height || 'Pending'}
+          `;
+
+          transactionsElement.appendChild(div);
         });
-      });
-      html += "</tbody></table>";
-      document.getElementById("content").innerHTML = html;
+
+      } catch (err) {
+        balanceElement.textContent = 'Error loading data. Please try again later.';
+        transactionsElement.innerHTML = '<div class="loading">Unable to load transactions at this time.</div>';
+      }
     }
 
-    getAddressesFromZpub(ZPUB);
+    loadWalletData();
   </script>
 </body>
 </html>
